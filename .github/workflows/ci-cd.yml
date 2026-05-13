@@ -3,7 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
+    tags: [ '*' ]
   pull_request:
     branches: [ main ]
 
@@ -51,7 +51,7 @@ jobs:
   deploy-dev:
     name: Deploy to Development
     needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     environment: dev
     steps:
@@ -61,12 +61,7 @@ jobs:
   deploy-uat:
     name: Deploy to UAT
     needs: [build-and-push, deploy-dev]
-    # Run on main (after dev) or on tags (always)
-    if: |
-      always() && 
-      needs.build-and-push.result == 'success' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
-      (needs.deploy-dev.result == 'success' || needs.deploy-dev.result == 'skipped')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: uat
     steps:
@@ -75,8 +70,8 @@ jobs:
 
   deploy-prd:
     name: Deploy to Production
-    needs: deploy-uat
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-and-push, deploy-uat]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: prd
     steps:
